@@ -17,6 +17,7 @@ Available Classes:
 Available Functions:
     - new_game: constructs a fresh game state.
 """
+import itertools
 import json
 from copy import deepcopy
 from collections import namedtuple
@@ -104,6 +105,15 @@ class State:
         elif self.turn_type == 'PreAssign':
             return (PreAssign(terr.name)
                     for terr in self.territories_owned(self.current_player.name))
+        elif self.turn_type == 'Place':
+            return self._place_actions(self.current_player)
+
+    def _place_actions(self, player):
+        territories_owned =[t.name for t in self.territories_owned(player.name)]
+        return (Place(terrs, troops)
+                for n in range(1, len(territories_owned))
+                for terrs in itertools.combinations(territories_owned, n)
+                for troops in integer_partitions(self.reinforcements(player.name), n))
 
     def transition(self, action):
         """Mutates the current state to be the resulting state from applying
@@ -239,7 +249,6 @@ class Territory:
         self.troops = troops
 
     def __eq__(self, other):
-        print('testing equal territory', flush=True)
         try:
             return (self.name == other.name and
                     self.neighbors == other.neighbors and
@@ -278,7 +287,6 @@ class Continent:
             return None
 
     def __eq__(self, other):
-        print('testing equal continent', flush=True)
         try:
             return (self.name == other.name and
                     self.owner == other.owner and
@@ -304,7 +312,6 @@ class Player:
         self.cards = cards or []
 
     def __eq__(self, other):
-        print('testing equal player', self, flush=True)
         try:
             return (self.name == other.name and
                     self.cards == other.cards)
@@ -320,6 +327,19 @@ class Player:
 # Moves
 PrePlace = namedtuple('PrePlace', ['territory'])
 PreAssign = namedtuple('PreAssign', ['territory'])
+Place = namedtuple('Place', ['territories', 'troops'])
+
+
+def integer_partitions(total, n):
+    """Generates all positive integer n-tuples that sum to total"""
+    if total == 0 or n == 0:
+        yield
+    elif n == 1:
+        yield total,
+    else:
+        for i in range(1, total):
+            for sub_partition in integer_partitions(total-i, n-1):
+                yield (i,) + sub_partition
 
 
 def _load_territories(file_name):
@@ -352,7 +372,6 @@ if __name__ == '__main__':
     players = ['Nate', 'Chris', 'Josh', 'Ben']
     state = new_game(players)
 
-    print(players)
     assert eval(repr(state)) == new_game(players)
 
     assert state.current_player.name == 'Nate', state.current_player.name
@@ -425,6 +444,6 @@ if __name__ == '__main__':
     assert i == 78, i
     assert state.turn_type == 'Place'
 
-    for p in players:
-        print(state.calculate_reinforcements(p))
-        print(list(state.continents_owned(p)))
+    print([t.name for t in state.territories_owned(state.current_player.name)])
+    for a in state.available_actions():
+        print(a)
