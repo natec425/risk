@@ -24,8 +24,6 @@ from collections import namedtuple
 TERRITORIES_FILE = 'territories.json'
 CONTINENTS_FILE = 'continents.json'
 
-# TODO: Replace Claim/Place with PrePlace/PreAssign
-
 
 class State:
     """Represents a given state in the boardgame Risk."""
@@ -100,11 +98,11 @@ class State:
         """Returns all actions available from the current state."""
         # TODO
         if self.turn_type == 'PrePlace':
-            return (Claim(t.name)
+            return (PrePlace(t.name)
                     for t in self.board.territories.values()
                     if t.owner is None)
         elif self.turn_type == 'PreAssign':
-            return (Place(terr.name, 1)
+            return (PreAssign(terr.name)
                     for terr in self.territories_owned(self.current_player.name))
 
     def transition(self, action):
@@ -112,23 +110,18 @@ class State:
         the provided action."""
         # TODO
         if self.turn_type == 'PrePlace':
-            self._claim(self.current_player, action.territory)
+            self._preplace(self.current_player, action.territory)
         elif self.turn_type == 'PreAssign':
-            self._place(self.current_player, action.territory, 1)
+            self._preassign(self.current_player, action.territory, 1)
         elif self.turn_type == 'Place':
             pass
         else:
             raise ValueError("I don't know how to handle that action")
 
-        # TODO: I'm hating that these two depend on the order they are executed.
-        # I'll have to fix it later.
-
     def _advance_player(self):
         self._current_player_i = (self._current_player_i + 1) % len(self.players)
 
     def _advance_turn_type(self):
-        # TODO: Man I'm hating the setup I have so far.
-        # I'll have to refactor this.
         if self.turn_type == 'PrePlace':
             if all(t.owner is not None for t in self.board.territories.values()):
                 self.turn_type = 'PreAssign'
@@ -142,7 +135,7 @@ class State:
         if self.turn_type == 'Place':
             self.next_player.reinforcements += self.calculate_reinforcements(self.next_player)
 
-    def _claim(self, player, terr):
+    def _preplace(self, player, terr):
         if self.board.territories[terr].owner is not None:
             raise ValueError('{} is already claimed.'.format(terr))
 
@@ -153,7 +146,7 @@ class State:
         self._advance_turn_type()
         self._advance_player()
 
-    def _place(self, player, terr, troop_count):
+    def _preassign(self, player, terr, troop_count):
         if self.board.territories[terr].owner is not player.name:
             raise ValueError('Can only place troops on territories you own.')
         if player.reinforcements < troop_count:
@@ -325,8 +318,8 @@ class Player:
 
 
 # Moves
-Claim = namedtuple('Claim', ['territory'])
-Place = namedtuple('Place', ['territory', 'troop_count'])
+PrePlace = namedtuple('PrePlace', ['territory'])
+PreAssign = namedtuple('PreAssign', ['territory'])
 
 
 def _load_territories(file_name):
@@ -367,8 +360,8 @@ if __name__ == '__main__':
     for p in players:
         assert state.reinforcements(p) == 30, state.reinforcements(p)
 
-    assert Claim('Alaska') in state.available_actions(), state.available_actions()
-    state.transition(Claim('Alaska'))
+    assert PrePlace('Alaska') in state.available_actions(), state.available_actions()
+    state.transition(PrePlace('Alaska'))
     assert state.owner('Alaska') == 'Nate'
     assert 'Alaska' in [t.name for t in state.territories_owned('Nate')]
     assert 'Alaska' not in [t.name for t in state.territories_owned('Chris')]
@@ -376,17 +369,17 @@ if __name__ == '__main__':
 
     assert state.turn_type == 'PrePlace'
     assert state.current_player.name == 'Chris'
-    assert Claim('Alaska') not in state.available_actions()
+    assert PrePlace('Alaska') not in state.available_actions()
     assert len(list(state.available_actions())) == 41
 
     try:
-        state.transition(Claim('Alaska'))
+        state.transition(PrePlace('Alaska'))
     except ValueError:
         pass
     else:
         print('ValueError not raised for invalid Alaska Claim')
 
-    state.transition(Claim('Ontario'))
+    state.transition(PrePlace('Ontario'))
 
     assert state.owner('Ontario') == 'Chris'
     assert 'Ontario' in [t.name for t in state.territories_owned('Chris')]
@@ -396,8 +389,8 @@ if __name__ == '__main__':
 
     assert state.turn_type == 'PrePlace'
     assert state.current_player.name == 'Josh'
-    assert Claim('Ontario') not in state.available_actions()
-    assert Claim('Alaska') not in state.available_actions()
+    assert PrePlace('Ontario') not in state.available_actions()
+    assert PrePlace('Alaska') not in state.available_actions()
 
     state.transition(next(state.available_actions()))
     state.transition(next(state.available_actions()))
