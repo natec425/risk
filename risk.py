@@ -1,4 +1,4 @@
-'''This module contains all the logic required to represent and
+"""This module contains all the logic required to represent and
 manipulate a game of risk.
 
 There are two major points of interest in this module, the new_game
@@ -16,7 +16,7 @@ Available Classes:
 
 Available Functions:
     - new_game: constructs a fresh game state.
-'''
+"""
 import json
 from copy import deepcopy
 from collections import namedtuple
@@ -25,11 +25,10 @@ TERRITORIES_FILE = 'territories.json'
 CONTINENTS_FILE = 'continents.json'
 
 # TODO: Replace Claim/Place with PrePlace/PreAssign
-# TODO: convert continents.json to be compliant with the old xml one
 
 
 class State:
-    '''Represents a given state in the boardgame Risk.'''
+    """Represents a given state in the boardgame Risk."""
     # .cards : [Cards]                 The deck of cards
     # .last_attacker : terr_id         Last territory to attack from
     # .last_defender : terr_id         Last territory to be attacked
@@ -42,14 +41,19 @@ class State:
 
         self.board = board
 
-        initial_reinforcements = 40 - (5 * (len(players) - 2))
-        self.players = [Player(name, reinforcements=initial_reinforcements)
-                        for name in players]
+        if all(isinstance(p, Player) for p in players):
+            self.players = players
+        elif all(isinstance(p, str) for p in players):
+            initial_reinforcements = 40 - (5 * (len(players) - 2))
+            self.players = [Player(name, reinforcements=initial_reinforcements)
+                            for name in players]
+        else:
+            raise ValueError('Argument to players must either be a list of names of Player objects.')
         self._current_player_i = current_player_i
         self.card_turnins = card_turnins
         self.turn_type = turn_type
 
-    def _player_rein(self, player):
+    def reinforcements(self, player):
         for p in self.players:
             if p.name == player:
                 return p.reinforcements
@@ -64,27 +68,27 @@ class State:
         return self.players[(self._current_player_i + 1) % len(self.players)]
 
     def troops(self, terr):
-        '''Returns the number of troops occupying the given territory.'''
+        """Returns the number of troops occupying the given territory."""
         return self.board.troops(terr)
 
     def owner(self, terr):
-        '''Returns the owner of the given territory.
+        """Returns the owner of the given territory.
 
         Territories may not be occupied. If they are occupied, the
         player occupying the territory is returned, otherwise None
         is returned.
-        '''
+        """
         return self.board.owner(terr)
 
     def territories_owned(self, player):
-        '''Returns an iterable of territories owned by the given player.'''
+        """Returns an iterable of territories owned by the given player."""
         return self.board.territories_owned(player)
 
     def continents_owned(self, player):
         return self.board.continents_owned(player)
 
     def neighbors(self, terr):
-        '''Returns an iterable of all territories neighboring terr.'''
+        """Returns an iterable of all territories neighboring terr."""
         return self.board.neighbors(terr)
 
     def calculate_reinforcements(self, player):
@@ -93,7 +97,7 @@ class State:
         return max(3, terr_contrib + cont_contrib)
 
     def available_actions(self):
-        '''Returns all actions available from the current state.'''
+        """Returns all actions available from the current state."""
         # TODO
         if self.turn_type == 'PrePlace':
             return (Claim(t.name)
@@ -104,8 +108,8 @@ class State:
                     for terr in self.territories_owned(self.current_player.name))
 
     def transition(self, action):
-        '''Mutates the current state to be the resulting state from applying
-        the provided action.'''
+        """Mutates the current state to be the resulting state from applying
+        the provided action."""
         # TODO
         if self.turn_type == 'PrePlace':
             self._claim(self.current_player, action.territory)
@@ -118,7 +122,6 @@ class State:
 
         # TODO: I'm hating that these two depend on the order they are executed.
         # I'll have to fix it later.
-
 
     def _advance_player(self):
         self._current_player_i = (self._current_player_i + 1) % len(self.players)
@@ -138,7 +141,6 @@ class State:
 
         if self.turn_type == 'Place':
             self.next_player.reinforcements += self.calculate_reinforcements(self.next_player)
-            
 
     def _claim(self, player, terr):
         if self.board.territories[terr].owner is not None:
@@ -165,7 +167,7 @@ class State:
         self._advance_player()
 
     def is_terminal(self):
-        '''Return True if the State is an end game state.'''
+        """Return True if the State is an end game state."""
         return len(self.players) == 1
 
     def copy(self):
@@ -190,7 +192,7 @@ class State:
 
 
 class Board:
-    '''Represents the state of the board.
+    """Represents the state of the board.
 
     Board objects are largely just a list of territories and a list
     of continents.
@@ -198,7 +200,7 @@ class Board:
     Public Attributes:
         - territories
         - continents
-    '''
+    """
 
     def __init__(self, territories, continents):
         self.territories = territories
@@ -231,11 +233,11 @@ class Board:
 
 
 class Territory:
-    '''Represents the state of a territory.
+    """Represents the state of a territory.
 
     Territory objects have a name, (possibly) an owner, and a number
     of occupying troops.
-    '''
+    """
 
     def __init__(self, name, neighbors, owner=None, troops=0):
         self.name = name
@@ -244,6 +246,7 @@ class Territory:
         self.troops = troops
 
     def __eq__(self, other):
+        print('testing equal territory', flush=True)
         try:
             return (self.name == other.name and
                     self.neighbors == other.neighbors and
@@ -263,13 +266,13 @@ class Territory:
 
 
 class Continent:
-    '''Represents the state of a continent.
+    """Represents the state of a continent.
 
     Continent objects have a name, (possibly) an owner, a collection
     of territories, and an ownership bonus.
-    '''
+    """
 
-    def __init__(self, name, bonus, territories, owner=None):
+    def __init__(self, name, bonus, territories):
         self.name = name
         self.territories = territories
         self.bonus = bonus
@@ -282,6 +285,7 @@ class Continent:
             return None
 
     def __eq__(self, other):
+        print('testing equal continent', flush=True)
         try:
             return (self.name == other.name and
                     self.owner == other.owner and
@@ -293,22 +297,21 @@ class Continent:
     def __repr__(self):
         return ('Continent({c.name!r}, '
                 '{c.bonus!r}, '
-                '{c.territories!r}, '
-                '{c.owner!r})').format(c=self)
+                '{c.territories!r})').format(c=self)
 
 
 class Player:
-    '''Represents the state of a player.
+    """Represents the state of a player.
 
     Player objects are a name, a list of cards.
-    '''
+    """
     def __init__(self, name, cards=None, reinforcements=0):
         self.name = name
         self.reinforcements = reinforcements
-        if cards is None:
-            self.cards = cards or []
+        self.cards = cards or []
 
     def __eq__(self, other):
+        print('testing equal player', self, flush=True)
         try:
             return (self.name == other.name and
                     self.cards == other.cards)
@@ -345,7 +348,7 @@ def _load_continents(file_name, territories):
 
 
 def new_game(players=None):
-    '''Returns a fresh game State to start a game from.'''
+    """Returns a fresh game State to start a game from."""
     territories = _load_territories(TERRITORIES_FILE)
     continents = _load_continents(CONTINENTS_FILE, territories)
     board = Board(territories, continents)
@@ -356,17 +359,20 @@ if __name__ == '__main__':
     players = ['Nate', 'Chris', 'Josh', 'Ben']
     state = new_game(players)
 
+    print(players)
+    assert eval(repr(state)) == new_game(players)
+
     assert state.current_player.name == 'Nate', state.current_player.name
 
     for p in players:
-        assert state._player_rein(p) == 30, state._player_rein(p)
+        assert state.reinforcements(p) == 30, state.reinforcements(p)
 
     assert Claim('Alaska') in state.available_actions(), state.available_actions()
     state.transition(Claim('Alaska'))
     assert state.owner('Alaska') == 'Nate'
     assert 'Alaska' in [t.name for t in state.territories_owned('Nate')]
     assert 'Alaska' not in [t.name for t in state.territories_owned('Chris')]
-    assert state._player_rein('Nate') == 29
+    assert state.reinforcements('Nate') == 29
 
     assert state.turn_type == 'PrePlace'
     assert state.current_player.name == 'Chris'
@@ -385,8 +391,8 @@ if __name__ == '__main__':
     assert state.owner('Ontario') == 'Chris'
     assert 'Ontario' in [t.name for t in state.territories_owned('Chris')]
     assert 'Ontario' not in [t.name for t in state.territories_owned('Nate')]
-    assert state._player_rein('Nate') == 29
-    assert state._player_rein('Chris') == 29
+    assert state.reinforcements('Nate') == 29
+    assert state.reinforcements('Chris') == 29
 
     assert state.turn_type == 'PrePlace'
     assert state.current_player.name == 'Josh'
@@ -411,10 +417,10 @@ if __name__ == '__main__':
     assert len(list(state.territories_owned('Josh'))) == 10
     assert len(list(state.territories_owned('Ben'))) == 10
 
-    assert state._player_rein('Nate') == 19
-    assert state._player_rein('Chris') == 19
-    assert state._player_rein('Josh') == 20
-    assert state._player_rein('Ben') == 20
+    assert state.reinforcements('Nate') == 19
+    assert state.reinforcements('Chris') == 19
+    assert state.reinforcements('Josh') == 20
+    assert state.reinforcements('Ben') == 20
 
     assert state.current_player.name == 'Josh'
 
