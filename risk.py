@@ -277,7 +277,7 @@ class Continent:
     @property
     def owner(self):
         if len(set(t.owner for t in self.territories)) == 1:
-            return self.territories[0].owner
+            return next(iter(self.territories)).owner
         else:
             return None
 
@@ -347,8 +347,6 @@ def _load_continents(file_name, territories):
 def new_game(players=None):
     '''Returns a fresh game State to start a game from.'''
     territories = _load_territories(TERRITORIES_FILE)
-    from pprint import pprint
-    pprint(territories)
     continents = _load_continents(CONTINENTS_FILE, territories)
     board = Board(territories, continents)
     return State(board, players or [], 'PrePlace')
@@ -430,4 +428,4 @@ if __name__ == '__main__':
 
     for p in players:
         print(state.calculate_reinforcements(p))
-        print(state.continents_owned(p))
+        print(list(state.continents_owned(p)))
