@@ -430,7 +430,8 @@ class Player:
     def __eq__(self, other):
         try:
             return (self.name == other.name and
-                    self.cards == other.cards)
+                    self.cards == other.cards and
+                    self.reinforcements == other.reinforcements)
         except AttributeError:
             return False
 
