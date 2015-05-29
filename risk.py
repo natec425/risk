@@ -27,7 +27,13 @@ CONTINENTS_FILE = 'continents.json'
 
 
 class State:
-    """Represents a given state in the boardgame Risk."""
+    """Represents a given state in the boardgame Risk.
+
+    :type board: Board
+    :type players: list[Player] | list[str]
+    :type turn_type: str
+    :type current_player_i: int
+    :type card_turnins: int"""
     # .cards : [Cards]                 The deck of cards
     # .last_attacker : terr_id         Last territory to attack from
     # .last_defender : terr_id         Last territory to be attacked
@@ -48,11 +54,19 @@ class State:
                             for name in players]
         else:
             raise ValueError('Argument to players must either be a list of names of Player objects.')
+
         self._current_player_i = current_player_i
         self.card_turnins = card_turnins
         self.turn_type = turn_type
 
     def reinforcements(self, player):
+        """Returns the number of reinforcements currently owned by player.
+        :type player: Player | str
+        :rtype: int
+        """
+        if isinstance(player, Player):
+            player = player.name
+
         for p in self.players:
             if p.name == player:
                 return p.reinforcements
@@ -60,14 +74,25 @@ class State:
 
     @property
     def current_player(self):
+        """Returns the current player.
+        :rtype: Player
+        """
         return self.players[self._current_player_i]
 
     @property
     def next_player(self):
+        """Returns the player next in line for a turn.
+        :rtype: Player
+        """
         return self.players[(self._current_player_i + 1) % len(self.players)]
 
     def troops(self, terr):
-        """Returns the number of troops occupying the given territory."""
+        """Returns the number of troops occupying the given territory.
+
+        :type terr: Territory | str
+        :rtype: int"""
+        if isinstance(terr, Territory):
+            terr = terr.name
         return self.board.troops(terr)
 
     def owner(self, terr):
@@ -76,27 +101,59 @@ class State:
         Territories may not be occupied. If they are occupied, the
         player occupying the territory is returned, otherwise None
         is returned.
+
+        :type terr: Territory | str
+        :rtype: Player
         """
+        if isinstance(terr, Territory):
+            terr = terr.name
         return self.board.owner(terr)
 
     def territories_owned(self, player):
-        """Returns an iterable of territories owned by the given player."""
+        """Returns an iterable of territories owned by the given player.
+
+        :type player: Player | str
+        :rtype: Iterable[Territory]"""
+        if isinstance(player, Player):
+            player = player.name
         return self.board.territories_owned(player)
 
     def continents_owned(self, player):
+        """Returns an iterable of continents owned by the given player.
+
+        :type player: Player | str
+        :rtype: Iterable[Continents]"""
+        if isinstance(player, Player):
+            player = player.name
         return self.board.continents_owned(player)
 
     def neighbors(self, terr):
-        """Returns an iterable of all territories neighboring terr."""
+        """Returns an iterable of all territories neighboring terr.
+
+        :type terr: Territory | str
+        :rtype: Iterable[Territory]"""
+        if isinstance(terr, Territory):
+            terr = terr.name
         return self.board.neighbors(terr)
 
     def calculate_reinforcements(self, player):
+        """Returns the number of expected reinforcements the given player will receive
+        at the beginning of their next turn (assuming the board stays changed).
+
+        :type player: Player | str
+        :rtype: int
+        """
+        if isinstance(player, Player):
+            player = player.name
+
         terr_contrib = len(list(self.territories_owned(player))) // 3
         cont_contrib = sum(c.bonus for c in self.continents_owned(player))
         return max(3, terr_contrib + cont_contrib)
 
     def available_actions(self):
-        """Returns all actions available from the current state."""
+        """Returns all actions available from the current state.
+
+        :rtype: Iterable[Action]"""
         # TODO
         if self.turn_type == 'PrePlace':
             return (PrePlace(t.name)
@@ -107,9 +164,17 @@ class State:
                     for terr in self.territories_owned(self.current_player.name))
         elif self.turn_type == 'Place':
             return self._place_actions(self.current_player)
+        else:
+            raise ValueError("I don't know how to handle that action.")
 
     def _place_actions(self, player):
-        territories_owned =[t.name for t in self.territories_owned(player.name)]
+        """Helper method that generates all possible actions a player can take during their
+        "Place" phase.
+
+        :type player: Player
+        :rtype: Iterable[Action]
+        """
+        territories_owned = [t.name for t in self.territories_owned(player.name)]
         return (Place(terrs, troops)
                 for n in range(1, len(territories_owned))
                 for terrs in itertools.combinations(territories_owned, n)
@@ -117,16 +182,18 @@ class State:
 
     def transition(self, action):
         """Mutates the current state to be the resulting state from applying
-        the provided action."""
+        the provided action.
+
+        :type action: Action"""
         # TODO
         if self.turn_type == 'PrePlace':
             self._preplace(self.current_player, action.territory)
         elif self.turn_type == 'PreAssign':
-            self._preassign(self.current_player, action.territory, 1)
+            self._preassign(self.current_player, action.territory)
         elif self.turn_type == 'Place':
             pass
         else:
-            raise ValueError("I don't know how to handle that action")
+            raise ValueError("I don't know how to handle that action.")
 
     def _advance_player(self):
         self._current_player_i = (self._current_player_i + 1) % len(self.players)
@@ -146,38 +213,50 @@ class State:
             self.next_player.reinforcements += self.calculate_reinforcements(self.next_player)
 
     def _preplace(self, player, terr):
-        if self.board.territories[terr].owner is not None:
+        """
+        :type player: Player
+        :type terr: str
+        """
+        if self.owner(terr) is not None:
             raise ValueError('{} is already claimed.'.format(terr))
 
-        self.board.territories[terr].owner = player.name
+        self.board.territories[terr].owner = player
         self.board.territories[terr].troops += 1
         player.reinforcements -= 1
 
         self._advance_turn_type()
         self._advance_player()
 
-    def _preassign(self, player, terr, troop_count):
-        if self.board.territories[terr].owner is not player.name:
+    def _preassign(self, player, terr):
+        """
+        :type player: Player
+        :type terr: str
+        """
+        if self.owner(terr).name != player.name:
             raise ValueError('Can only place troops on territories you own.')
-        if player.reinforcements < troop_count:
-            raise ValueError("You can't place {} troops when you only have {}.".format(
-                troop_count, player.reinforcements))
 
-        self.board.territories[terr].troops += troop_count
-        player.reinforcements -= troop_count
+        self.board.territories[terr].troops += 1
+        player.reinforcements -= 1
 
         self._advance_turn_type()
         self._advance_player()
 
     def is_terminal(self):
-        """Return True if the State is an end game state."""
+        """Return True if the State is an end game state.
+        :rtype: bool
+        """
         return len(self.players) == 1
 
     def copy(self):
+        """Returns a deepcopy of the state.
+
+        :rtype: State
+        """
         return deepcopy(self)
 
     def __eq__(self, other):
         try:
+            # noinspection PyProtectedMember
             return (self.board == other.board and
                     self.players == other.players and
                     self._current_player_i == other._current_player_i and
@@ -200,28 +279,55 @@ class Board:
     Board objects are largely just a list of territories and a list
     of continents.
 
-    Public Attributes:
-        - territories
-        - continents
+    :type territories: dict[str, Territory]
+    :type continents: dict[str, Continent]
     """
-
     def __init__(self, territories, continents):
         self.territories = territories
         self.continents = continents
 
     def troops(self, terr):
+        """Returns the number of troops at terr.
+
+        :type terr: str
+        :rtype: int
+        """
         return self.territories[terr].troops
 
     def owner(self, terr):
+        """Returns the Player that owns terr.
+
+        :type terr: str
+        :rtype: Player
+        """
         return self.territories[terr].owner
 
     def territories_owned(self, player):
-        return (t for t in self.territories.values() if t.owner == player)
+        """Returns an Iterable of all the territries owned by player
+
+        :type player: str
+        :rtype: Iterable[Territory]
+        """
+        return (terr
+                for terr in self.territories.values()
+                if terr.owner is not None and terr.owner.name == player)
 
     def continents_owned(self, player):
-        return (c for c in self.continents.values() if c.owner == player)
+        """ Returns an Iterable of all the continents owned by player.
+
+        :type player: str
+        :rtype: Iterable[Continent]
+        """
+        return (c
+                for c in self.continents.values()
+                if c.owner is not None and c.owner.name == player)
 
     def neighbors(self, terr):
+        """Returns an Iterable of the names of the territories that neighbor terr.
+
+        :type terr: str
+        :rtype: Iterable[str]
+        """
         return self.territories[terr].neighbors
 
     def __eq__(self, other):
@@ -240,8 +346,12 @@ class Territory:
 
     Territory objects have a name, (possibly) an owner, and a number
     of occupying troops.
-    """
 
+    :type name: str
+    :type neighbors: Iterable[str]
+    :type owner: Player
+    :type troops: int
+    """
     def __init__(self, name, neighbors, owner=None, troops=0):
         self.name = name
         self.neighbors = neighbors
@@ -272,8 +382,11 @@ class Continent:
 
     Continent objects have a name, (possibly) an owner, a collection
     of territories, and an ownership bonus.
-    """
 
+    :type name: str
+    :type territories: Iterable[Territory]
+    :type bonus: int
+    """
     def __init__(self, name, bonus, territories):
         self.name = name
         self.territories = territories
@@ -310,6 +423,9 @@ class Player:
         self.name = name
         self.reinforcements = reinforcements
         self.cards = cards or []
+
+    def __hash__(self):
+        return hash(self.name)
 
     def __eq__(self, other):
         try:
@@ -381,7 +497,7 @@ if __name__ == '__main__':
 
     assert PrePlace('Alaska') in state.available_actions(), state.available_actions()
     state.transition(PrePlace('Alaska'))
-    assert state.owner('Alaska') == 'Nate'
+    assert state.owner('Alaska').name == 'Nate'
     assert 'Alaska' in [t.name for t in state.territories_owned('Nate')]
     assert 'Alaska' not in [t.name for t in state.territories_owned('Chris')]
     assert state.reinforcements('Nate') == 29
@@ -400,7 +516,7 @@ if __name__ == '__main__':
 
     state.transition(PrePlace('Ontario'))
 
-    assert state.owner('Ontario') == 'Chris'
+    assert state.owner('Ontario').name == 'Chris'
     assert 'Ontario' in [t.name for t in state.territories_owned('Chris')]
     assert 'Ontario' not in [t.name for t in state.territories_owned('Nate')]
     assert state.reinforcements('Nate') == 29
@@ -445,5 +561,8 @@ if __name__ == '__main__':
     assert state.turn_type == 'Place'
 
     print([t.name for t in state.territories_owned(state.current_player.name)])
+    i = 0
     for a in state.available_actions():
+        i += 1
         print(a)
+    print(i)
