@@ -20,3 +20,25 @@ class TestPlayer(TestCase):
         self.assertNotEqual(Player('foo', ['card'], 3),
                             Player('foo', ['card'], 2),
                             'Players with different attribute values are not equal')
+
+    def test_repr(self):
+        self.assertEqual(eval(repr(Player('a'))),
+                         Player('a'))
+        self.assertNotEqual(eval(repr(Player('a'))),
+                            Player('b'))
+
+        self.assertEqual(eval(repr(Player('a', ['card']))),
+                         Player('a', ['card']))
+        self.assertNotEqual(eval(repr(Player('a', ['card']))),
+                            Player('a', ['card', 'card']))
+        self.assertNotEqual(eval(repr(Player('a', ['card']))),
+                            Player('a', ['not card']))
+        self.assertNotEqual(eval(repr(Player('a', ['card']))),
+                            Player('b', ['card']))
+
+        self.assertEqual(eval(repr(Player('a', ['card'], 4))),
+                         Player('a', ['card'], 4))
+        self.assertNotEqual(eval(repr(Player('a', ['card'], 4))),
+                            Player('b', ['card'], 4))
+        self.assertNotEqual(eval(repr(Player('a', ['card'], 4))),
+                            Player('a', ['card'], 3))
