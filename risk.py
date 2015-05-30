@@ -477,12 +477,12 @@ def _load_continents(file_name, territories):
     return continents
 
 
-def new_game(players=None):
+def new_game(players):
     """Returns a fresh game State to start a game from."""
     territories = _load_territories(TERRITORIES_FILE)
     continents = _load_continents(CONTINENTS_FILE, territories)
     board = Board(territories, continents)
-    return State(board, players or [], 'PrePlace')
+    return State(board, players, 'PrePlace')
 
 
 if __name__ == '__main__':
