@@ -21,9 +21,10 @@ import itertools
 import json
 from copy import deepcopy
 from collections import namedtuple
+import os
 
-TERRITORIES_FILE = 'territories.json'
-CONTINENTS_FILE = 'continents.json'
+TERRITORIES_FILE = os.path.join(os.path.dirname(__file__), 'territories.json')
+CONTINENTS_FILE = os.path.join(os.path.dirname(__file__), 'continents.json')
 
 
 class State:
