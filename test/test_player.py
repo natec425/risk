@@ -1,9 +1,9 @@
-from unittest import TestCase
+import unittest
 
 from risk import Player
 
 
-class TestPlayer(TestCase):
+class TestPlayer(unittest.TestCase):
     def test_eq(self):
         p1 = Player('a')
         p2 = Player('b')
