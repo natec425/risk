@@ -87,6 +87,14 @@ class State:
         """
         return self.players[(self._current_player_i + 1) % len(self.players)]
 
+    @property
+    def territories(self):
+        return self.board.territories
+
+    @property
+    def continents(self):
+        return self.board.continents
+
     def troops(self, terr):
         """Returns the number of troops occupying the given territory.
 
