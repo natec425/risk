@@ -4,6 +4,10 @@ from risk import *
 
 
 class TestRisk(unittest.TestCase):
+    def assertIsOneOf(self, obj, *types):
+        if not any(isinstance(obj, t) for t in types):
+            self.fail("{} is not an instance of any of the following types: {}".format(obj, types))
+
     def test_too_few_players(self):
         with self.assertRaises(ValueError):
             new_game([])
@@ -83,3 +87,9 @@ class TestRisk(unittest.TestCase):
         self.assertEqual("Attack", state.turn_type)
         self.assertEqual("Nate", state.current_player.name)
         self.assertEqual(0, state.reinforcements("Nate"))
+
+        for action in state.available_actions():
+            self.assertIsOneOf(action, Attack, DontAttack)
+            if isinstance(action, Attack):
+                self.assertIn(action.from_territory, state.territories_owned(state.current_player))
+                self.assertNotIn(action.to_territory, state.territories_owned(state.current_player))

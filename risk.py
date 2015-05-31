@@ -173,6 +173,10 @@ class State:
                     for terr in self.territories_owned(self.current_player.name))
         elif self.turn_type == 'Place':
             return self._place_actions(self.current_player)
+        elif self.turn_type == 'Attack':
+            return self._attack_actions(self.current_player)
+        elif self.turn_type == 'Fortify':
+            return self._fortify_actions(self.current_player)
         else:
             raise ValueError("I don't know how to handle that action.")
 
@@ -189,18 +193,45 @@ class State:
                 for terrs in itertools.combinations(territories_owned, n)
                 for troops in integer_partitions(self.reinforcements(player.name), n))
 
+    def _attack_actions(self, player):
+        for owned in self.territories_owned(player):
+            for neighbor in self.neighbors(owned):
+                if self.board.territories[neighbor].owner != player:
+                    for troops in range(2, self.troops(owned)):
+                        yield Attack(owned, neighbor, troops)
+        yield DontAttack()
+
+    def _fortify_actions(self, player):
+        owned_terrs = list(self.territories_owned(player))
+        for from_terr in owned_terrs:
+            for to_terr in owned_terrs:
+                for troops in range(1, self.troops(from_terr)):
+                    yield Fortify(from_terr, to_terr, troops)
+        yield DontFortify()
+
     def transition(self, action):
         """Mutates the current state to be the resulting state from applying
         the provided action.
 
         :type action: Action"""
         # TODO
-        if self.turn_type == 'PrePlace':
+        if self.turn_type == 'PrePlace' and isinstance(action, PrePlace):
             self._preplace(self.current_player, action.territory)
-        elif self.turn_type == 'PreAssign':
+        elif self.turn_type == 'PreAssign' and isinstance(action, PreAssign):
             self._preassign(self.current_player, action.territory)
-        elif self.turn_type == 'Place':
+        elif self.turn_type == 'TurnInCards':
+            raise NotImplemented
+        elif self.turn_type == 'Place' and isinstance(action, Place):
             self._place(self.current_player, action.territories, action.troops)
+        elif self.turn_type == 'Attack' and isinstance(action, Attack):
+            raise NotImplemented
+        elif self.turn_type == 'Attack' and isinstance(action, DontAttack):
+            raise NotImplemented
+        elif self.turn_type == 'Fortify' and isinstance(action, Fortify):
+            self._fortify(self.current_player, action.from_territory,
+                          action.to_territory, action.troops)
+        elif self.turn_type == 'Fortify' and isinstance(action, DontFortify):
+            self._advance_player()
         else:
             raise ValueError("I don't know how to handle that action.")
 
@@ -265,6 +296,25 @@ class State:
             player.reinforcements -= troop
 
         self.turn_type = "Attack"
+
+    def _fortify(self, player, from_terr, to_terr, troops):
+        if to_terr not in [t.name for t in self.neighbors(from_terr)]:
+            raise ValueError("You can only fortify to neighboring territories.")
+        if from_terr not in self.territories_owned(player):
+            raise ValueError("You can't fortify territories you don't own.")
+        if to_terr not in self.territories_owned(player):
+            raise ValueError("You can't fortify territories you don't own.")
+        if not (self.troops(from_terr) < troops):
+            raise ValueError("You can't fortify with more troops than are currently on a territory.")
+        if troops < 1:
+            raise ValueError("You must fortify using at least 1 troop.")
+
+        self.board.territories[from_terr].troops -= troops
+        self.board.territories[to_terr].troops += troops
+
+        self._advance_player()
+        self.turn_type = "Place"
+        self.current_player.reinforcements += self.calculate_reinforcements(self.current_player)
 
     def is_terminal(self):
         """Return True if the State is an end game state.
@@ -470,6 +520,11 @@ class Player:
 PrePlace = namedtuple('PrePlace', ['territory'])
 PreAssign = namedtuple('PreAssign', ['territory'])
 Place = namedtuple('Place', ['territories', 'troops'])
+Attack = namedtuple('Attack', ['from_territory', 'to_territory', 'troops'])
+DontAttack = namedtuple('DontAttack', [])
+Fortify = namedtuple('Fortify', ['from_territory', 'to_territory', 'troops'])
+DontFortify = namedtuple('DontFortify', [])
+TurnInCards = namedtuple('TurnInCards', [])
 
 
 def integer_partitions(total, n):
