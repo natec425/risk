@@ -200,7 +200,7 @@ class State:
         elif self.turn_type == 'PreAssign':
             self._preassign(self.current_player, action.territory)
         elif self.turn_type == 'Place':
-            pass
+            self._place(self.current_player, action.territories, action.troops)
         else:
             raise ValueError("I don't know how to handle that action.")
 
@@ -249,6 +249,22 @@ class State:
 
         self._advance_turn_type()
         self._advance_player()
+
+    def _place(self, player, terrs, troops):
+        owned_terrs = (t.name for t in self.territories_owned(player))
+        if any(terr not in owned_terrs
+               for terr in terrs):
+            raise ValueError("""You can only place troops on territories you own.
+            Owned: {}
+            Targets: {}""".format(list(self.territories_owned(player)), terrs))
+        if sum(troops) > self.reinforcements(player):
+            raise ValueError("You can't place more troops than you have reinforcements.")
+
+        for terr, troop in zip(terrs, troops):
+            self.board.territories[terr].troops += troop
+            player.reinforcements -= troop
+
+        self.turn_type = "Attack"
 
     def is_terminal(self):
         """Return True if the State is an end game state.
@@ -458,9 +474,7 @@ Place = namedtuple('Place', ['territories', 'troops'])
 
 def integer_partitions(total, n):
     """Generates all positive integer n-tuples that sum to total"""
-    if total == 0 or n == 0:
-        yield
-    elif n == 1:
+    if n == 1:
         yield total,
     else:
         for i in range(1, total):
