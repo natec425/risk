@@ -25,7 +25,8 @@ import os
 import random
 from collections.abc import Mapping, Sequence
 from abc import ABCMeta, abstractmethod
-from array import array
+
+from util import integer_compositions, choose
 
 TERRITORIES_FILE = os.path.join(os.path.dirname(__file__), 'territories.json')
 CONTINENTS_FILE = os.path.join(os.path.dirname(__file__), 'continents.json')
@@ -244,12 +245,19 @@ class PreAssignState(RiskState):
 
 
 class PlaceState(RiskState):
+    def _action_space_len(self):
+        num_territories = sum(1 for _ in self.territories_owned(self.current_player))
+        num_reinforcements = self.reinforcements(self.current_player)
+
+        return sum(choose(num_territories, n) * choose(num_reinforcements - 1, n - 1)
+                   for n in range(num_territories, num_reinforcements))
+
     def available_actions(self):
         territories_owned = list(self.territories_owned(self.current_player))
         reinforcements = self.reinforcements(self.current_player)
         for n in range(1, min(reinforcements, len(territories_owned))):
             for terrs in itertools.combinations(territories_owned, n):
-                for troops in integer_partitions(reinforcements, n):
+                for troops in integer_compositions(reinforcements, n):
                     yield Place(terrs, troops)
 
     def transition(self, action):
@@ -552,17 +560,6 @@ class Actions(Mapping, Sequence):
 
     def __len__(self):
         return self.length
-
-
-def integer_partitions(total, n):
-    """Generates all n-length partitions of total"""
-    if n == 1:
-        yield array('H', (total,))
-    else:
-        for i in range(1, total):
-            for sub_partition in integer_partitions(total-i, n-1):
-                sub_partition.append(i)
-                yield sub_partition
 
 
 def _load_territories(file_name):
