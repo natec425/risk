@@ -22,7 +22,10 @@ import json
 from copy import deepcopy
 from collections import namedtuple
 import os
+import random
+from collections.abc import Mapping, Sequence
 from abc import ABCMeta, abstractmethod
+from array import array
 
 TERRITORIES_FILE = os.path.join(os.path.dirname(__file__), 'territories.json')
 CONTINENTS_FILE = os.path.join(os.path.dirname(__file__), 'continents.json')
@@ -35,6 +38,10 @@ class State(metaclass=ABCMeta):
 
     @abstractmethod
     def transition(self, action):
+        ...
+
+    @abstractmethod
+    def is_terminal(self):
         ...
 
 
@@ -162,9 +169,15 @@ class RiskState(State):
     def copy(self):
         return deepcopy(self)
 
+    def is_terminal(self):
+        return False
+
     def __eq__(self, other):
         return (isinstance(other, self.__class__) and
                 self.__dict__ == other.__dict__)
+
+    def __str__(self):
+        return "\n\t".join(str(terr) for terr in self.territories)
 
     def __repr__(self):
         return (str(self.__class__.__name__) + "(" +
@@ -173,20 +186,23 @@ class RiskState(State):
 
 class PrePlaceState(RiskState):
     def available_actions(self):
-        for terr in self.territories:
-            if terr.owner is None:
-                yield PrePlace(terr.name)
+        unoccupied_territories = list(t.name for t in self.territories if t.owner is None)
+
+        def mapper(i):
+            return PrePlace(unoccupied_territories[i])
+
+        return Actions(mapper, len(unoccupied_territories))
 
     def transition(self, action):
         if not isinstance(action, PrePlace):
             raise ValueError("PrePlaceState cannot process {!r}".format(action))
-        else:
-            if self.owner(action.territory) is not None:
-                raise ValueError('{!r} is already claimed.'.format(action.territory))
 
-            self.board.territories[action.territory].owner = self.current_player
-            self.board.territories[action.territory].troops += 1
-            self.current_player.reinforcements -= 1
+        if self.owner(action.territory) is not None:
+            raise ValueError('{!r} is already claimed.'.format(action.territory))
+
+        self.board.territories[action.territory].owner = self.current_player
+        self.board.territories[action.territory].troops += 1
+        self.current_player.reinforcements -= 1
 
         if any(terr.owner is None for terr in self.territories):
             return PrePlaceState(self.board, self.players,
@@ -200,365 +216,147 @@ class PrePlaceState(RiskState):
 
 class PreAssignState(RiskState):
     def available_actions(self):
-        for terr in self.territories_owned(self.current_player):
-            yield PreAssign(terr.name)
+        owned_terrs = list(t.name for t in self.territories_owned(self.current_player))
+
+        def mapper(i):
+            return PreAssign(owned_terrs[i])
+
+        return Actions(mapper, len(owned_terrs))
 
     def transition(self, action):
         if not isinstance(action, PreAssign):
             raise ValueError("PreAssignState cannot process {!r}".format(action))
-        else:
-            if self.owner(action.territory).name != self.current_player.name:
-                raise ValueError('Can only place troops on territories you own.')
 
-            self.board.territories[action.territory].troops += 1
-            self.current_player.reinforcements -= 1
+        if self.owner(action.territory).name != self.current_player.name:
+            raise ValueError('Can only place troops on territories you own.')
+
+        self.board.territories[action.territory].troops += 1
+        self.current_player.reinforcements -= 1
 
         if any(pl.reinforcements != 0 for pl in self.players):
             return PreAssignState(self.board, self.players,
                                   (self.current_player_i + 1) % len(self.players),
                                   self.card_turnins)
         else:
+            self.next_player.reinforcements += self.calculate_reinforcements(self.next_player)
             return PlaceState(self.board, self.players,
                               0, self.card_turnins)
 
 
 class PlaceState(RiskState):
-    pass
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-class State:
-    """Represents a given state in the boardgame Risk.
-
-    :type board: Board
-    :type players: list[Player] | list[str]
-    :type turn_type: str
-    :type current_player_i: int
-    :type card_turnins: int"""
-    # .cards : [Cards]                 The deck of cards
-    # .last_attacker : terr_id         Last territory to attack from
-    # .last_defender : terr_id         Last territory to be attacked
-    def __init__(self, board, players, turn_type,
-                 current_player_i=0, card_turnins=0):
-        if len(players) < 1:
-            raise ValueError('At least 1 player is needed.')
-        if current_player_i >= len(players):
-            raise IndexError('current_player_i must be <= len(players)')
-
-        self.board = board
-
-        if all(isinstance(p, Player) for p in players):
-            self.players = players
-        elif all(isinstance(p, str) for p in players):
-            initial_reinforcements = 40 - (5 * (len(players) - 2))
-            self.players = [Player(name, reinforcements=initial_reinforcements)
-                            for name in players]
-        else:
-            raise ValueError('Argument to players must either be a list of names of Player objects.')
-
-        self._current_player_i = current_player_i
-        self.card_turnins = card_turnins
-        self.turn_type = turn_type
-
-    def reinforcements(self, player):
-        """Returns the number of reinforcements currently owned by player.
-        :type player: Player | str
-        :rtype: int
-        """
-        if isinstance(player, Player):
-            player = player.name
-
-        for p in self.players:
-            if p.name == player:
-                return p.reinforcements
-        raise KeyError('{} not in players'.format(player))
-
-    @property
-    def current_player(self):
-        """Returns the current player.
-        :rtype: Player
-        """
-        return self.players[self._current_player_i]
-
-    @property
-    def next_player(self):
-        """Returns the player next in line for a turn.
-        :rtype: Player
-        """
-        return self.players[(self._current_player_i + 1) % len(self.players)]
-
-    @property
-    def territories(self):
-        return self.board.territories
-
-    @property
-    def continents(self):
-        return self.board.continents
-
-    def troops(self, terr):
-        """Returns the number of troops occupying the given territory.
-
-        :type terr: Territory | str
-        :rtype: int"""
-        if isinstance(terr, Territory):
-            terr = terr.name
-        return self.board.troops(terr)
-
-    def owner(self, terr):
-        """Returns the owner of the given territory.
-
-        Territories may not be occupied. If they are occupied, the
-        player occupying the territory is returned, otherwise None
-        is returned.
-
-        :type terr: Territory | str
-        :rtype: Player
-        """
-        if isinstance(terr, Territory):
-            terr = terr.name
-        return self.board.owner(terr)
-
-    def territories_owned(self, player):
-        """Returns an iterable of territories owned by the given player.
-
-        :type player: Player | str
-        :rtype: Iterable[Territory]"""
-        if isinstance(player, Player):
-            player = player.name
-        return self.board.territories_owned(player)
-
-    def continents_owned(self, player):
-        """Returns an iterable of continents owned by the given player.
-
-        :type player: Player | str
-        :rtype: Iterable[Continents]"""
-        if isinstance(player, Player):
-            player = player.name
-        return self.board.continents_owned(player)
-
-    def neighbors(self, terr):
-        """Returns an iterable of all territories neighboring terr.
-
-        :type terr: Territory | str
-        :rtype: Iterable[Territory]"""
-        if isinstance(terr, Territory):
-            terr = terr.name
-        return self.board.neighbors(terr)
-
-    def calculate_reinforcements(self, player):
-        """Returns the number of expected reinforcements the given player will receive
-        at the beginning of their next turn (assuming the board stays changed).
-
-        :type player: Player | str
-        :rtype: int
-        """
-        if isinstance(player, Player):
-            player = player.name
-
-        terr_contrib = len(list(self.territories_owned(player))) // 3
-        cont_contrib = sum(c.bonus for c in self.continents_owned(player))
-        return max(3, terr_contrib + cont_contrib)
-
     def available_actions(self):
-        """Returns all actions available from the current state.
+        territories_owned = list(self.territories_owned(self.current_player))
+        reinforcements = self.reinforcements(self.current_player)
+        for n in range(1, min(reinforcements, len(territories_owned))):
+            for terrs in itertools.combinations(territories_owned, n):
+                for troops in integer_partitions(reinforcements, n):
+                    yield Place(terrs, troops)
 
-        :rtype: Iterable[Action]"""
-        # TODO
-        if self.turn_type == 'PrePlace':
-            return (PrePlace(t.name)
-                    for t in self.board.territories.values()
-                    if t.owner is None)
-        elif self.turn_type == 'PreAssign':
-            return (PreAssign(terr.name)
-                    for terr in self.territories_owned(self.current_player.name))
-        elif self.turn_type == 'Place':
-            return self._place_actions(self.current_player)
-        elif self.turn_type == 'Attack':
-            return self._attack_actions(self.current_player)
-        elif self.turn_type == 'Fortify':
-            return self._fortify_actions(self.current_player)
-        else:
-            raise ValueError("I don't know how to handle that action.")
+    def transition(self, action):
+        if not isinstance(action, Place):
+            raise ValueError("PlaceState cannot process {!r}".format(action))
 
-    def _place_actions(self, player):
-        """Helper method that generates all possible actions a player can take during their
-        "Place" phase.
+        owned_terrs = (t.name for t in self.territories_owned(self.current_player))
+        if any(terr not in owned_terrs for terr in action.territories):
+            raise ValueError("""You can only place troops on territories you own.
+            Owned: {}
+            Targets: {}""".format(list(self.territories_owned(self.current_player)),
+                                  action.territories))
+        if sum(action.troops) > self.reinforcements(self.current_player):
+            raise ValueError("You can't place more troops than you have reinforcements.")
 
-        :type player: Player
-        :rtype: Iterable[Action]
-        """
-        territories_owned = [t.name for t in self.territories_owned(player.name)]
-        return (Place(terrs, troops)
-                for n in range(1, len(territories_owned))
-                for terrs in itertools.combinations(territories_owned, n)
-                for troops in integer_partitions(self.reinforcements(player.name), n))
+        for terr, troop in zip(action.territories, action.troops):
+            self.board.territories[terr].troops += troop
+            self.current_player.reinforcements -= troop
 
-    def _attack_actions(self, player):
-        for owned in self.territories_owned(player):
+        return AttackState(self.board, self.players, self.current_player_i, self.card_turnins)
+
+
+class AttackState(RiskState):
+    def available_actions(self):
+        for owned in self.territories_owned(self.current_player):
             for neighbor in self.neighbors(owned):
-                if self.board.territories[neighbor].owner != player:
+                if self.owner(neighbor).name != self.current_player.name:
                     for troops in range(2, self.troops(owned)):
-                        yield Attack(owned, neighbor, troops)
+                        yield Attack(owned.name, neighbor, troops)
         yield DontAttack()
 
-    def _fortify_actions(self, player):
-        owned_terrs = list(self.territories_owned(player))
-        for from_terr in owned_terrs:
-            for to_terr in owned_terrs:
-                for troops in range(1, self.troops(from_terr)):
-                    yield Fortify(from_terr, to_terr, troops)
+    def transition(self, action):
+        attack = isinstance(action, Attack)
+        dont_attack = isinstance(action, DontAttack)
+        if not (attack or dont_attack):
+            raise ValueError("AttackState cannot process {!r}".format(action))
+        if attack:
+            if action.from_territory not in (t.name
+                                             for t in self.territories_owned(self.current_player)):
+                raise ValueError("You can only attack from territories you own.")
+            if action.to_territory in (t.name
+                                       for t in self.territories_owned(self.current_player)):
+                raise ValueError("You can't attack your own territories.")
+            if action.to_territory not in self.neighbors(action.from_territory):
+                raise ValueError("You can only attack neighboring territories.")
+            if action.troops < 2:
+                raise ValueError("You can't attack with less than 2 troops.")
+
+            attacker_rolls = iter(sorted(random.randint(1, 6)
+                                         for _ in range(action.troops - 1)))
+            defender_rolls = iter(sorted(random.randint(1, 6)
+                                         for _ in range(self.troops(action.to_territory))))
+
+            for attacker_roll, defender_roll in zip(attacker_rolls, defender_rolls):
+                if attacker_roll > defender_roll:
+                    self.board.territories[action.to_territory].troops -= 1
+                else:
+                    self.board.territories[action.from_territory].troops -= 1
+
+            if self.troops(action.to_territory) == 0:
+                remaining_troops = len(list(attacker_rolls))
+                self.board.territories[action.to_territory].owner = self.current_player
+                self.board.territories[action.to_territory].troops = remaining_troops
+                self.board.territories[action.from_territory].troops -= remaining_troops
+
+            return AttackState(self.board, self.players, self.current_player_i, self.card_turnins)
+        else:
+            return FortifyState(self.board, self.players, self.current_player_i, self.card_turnins)
+
+
+class FortifyState(RiskState):
+    def available_actions(self):
+        for source in self.territories_owned(self.current_player):
+            for dest in self.neighbors(source):
+                for n in range(1, self.troops(source) - 1):
+                    yield Fortify(source, dest, n)
         yield DontFortify()
 
     def transition(self, action):
-        """Mutates the current state to be the resulting state from applying
-        the provided action.
+        fortify = isinstance(action, Fortify)
+        dont_fortify = isinstance(action, DontFortify)
+        if not (fortify or dont_fortify):
+            raise ValueError("FortifyState cannot process {!r}".format(action))
+        if fortify:
+            if (self.owner(action.from_territory) != self.current_player or
+                self.owner(action.to_territory) != self.current_player):
+                raise ValueError("You can only fortify between territories you own.")
+            if action.troops >= self.troops(action.from_territory):
+                raise ValueError("You must leave at least 1 troop behind when fortifying.")
 
-        :type action: Action"""
-        # TODO
-        if self.turn_type == 'PrePlace' and isinstance(action, PrePlace):
-            self._preplace(self.current_player, action.territory)
-        elif self.turn_type == 'PreAssign' and isinstance(action, PreAssign):
-            self._preassign(self.current_player, action.territory)
-        elif self.turn_type == 'TurnInCards':
-            raise NotImplemented
-        elif self.turn_type == 'Place' and isinstance(action, Place):
-            self._place(self.current_player, action.territories, action.troops)
-        elif self.turn_type == 'Attack' and isinstance(action, Attack):
-            raise NotImplemented
-        elif self.turn_type == 'Attack' and isinstance(action, DontAttack):
-            raise NotImplemented
-        elif self.turn_type == 'Fortify' and isinstance(action, Fortify):
-            self._fortify(self.current_player, action.from_territory,
-                          action.to_territory, action.troops)
-        elif self.turn_type == 'Fortify' and isinstance(action, DontFortify):
-            self._advance_player()
-        else:
-            raise ValueError("I don't know how to handle that action.")
+            self.board.territories[action.from_territory].troops -= action.troops
+            self.board.territories[action.to_territory].troops += action.troops
 
-    def _advance_player(self):
-        self._current_player_i = (self._current_player_i + 1) % len(self.players)
+            return PlaceState(self.board, self.players,
+                              (self.current_player_i + 1) % len(self.players),
+                              self.card_turnins)
 
-    def _advance_turn_type(self):
-        if self.turn_type == 'PrePlace':
-            if all(t.owner is not None for t in self.board.territories.values()):
-                self.turn_type = 'PreAssign'
-            return
 
-        if self.turn_type == 'PreAssign':
-            if all(p.reinforcements == 0 for p in self.players):
-                self._current_player_i = -1
-                self.turn_type = 'Place'
+class TerminalState(RiskState):
+    def transition(self, action):
+        raise NotImplemented
 
-        if self.turn_type == 'Place':
-            self.next_player.reinforcements += self.calculate_reinforcements(self.next_player)
-
-    def _preplace(self, player, terr):
-        """
-        :type player: Player
-        :type terr: str
-        """
-        if self.owner(terr) is not None:
-            raise ValueError('{} is already claimed.'.format(terr))
-
-        self.board.territories[terr].owner = player
-        self.board.territories[terr].troops += 1
-        player.reinforcements -= 1
-
-        self._advance_turn_type()
-        self._advance_player()
-
-    def _preassign(self, player, terr):
-        """
-        :type player: Player
-        :type terr: str
-        """
-        if self.owner(terr).name != player.name:
-            raise ValueError('Can only place troops on territories you own.')
-
-        self.board.territories[terr].troops += 1
-        player.reinforcements -= 1
-
-        self._advance_turn_type()
-        self._advance_player()
-
-    def _place(self, player, terrs, troops):
-        owned_terrs = (t.name for t in self.territories_owned(player))
-        if any(terr not in owned_terrs
-               for terr in terrs):
-            raise ValueError("""You can only place troops on territories you own.
-            Owned: {}
-            Targets: {}""".format(list(self.territories_owned(player)), terrs))
-        if sum(troops) > self.reinforcements(player):
-            raise ValueError("You can't place more troops than you have reinforcements.")
-
-        for terr, troop in zip(terrs, troops):
-            self.board.territories[terr].troops += troop
-            player.reinforcements -= troop
-
-        self.turn_type = "Attack"
-
-    def _fortify(self, player, from_terr, to_terr, troops):
-        if to_terr not in [t.name for t in self.neighbors(from_terr)]:
-            raise ValueError("You can only fortify to neighboring territories.")
-        if from_terr not in self.territories_owned(player):
-            raise ValueError("You can't fortify territories you don't own.")
-        if to_terr not in self.territories_owned(player):
-            raise ValueError("You can't fortify territories you don't own.")
-        if not (self.troops(from_terr) < troops):
-            raise ValueError("You can't fortify with more troops than are currently on a territory.")
-        if troops < 1:
-            raise ValueError("You must fortify using at least 1 troop.")
-
-        self.board.territories[from_terr].troops -= troops
-        self.board.territories[to_terr].troops += troops
-
-        self._advance_player()
-        self.turn_type = "Place"
-        self.current_player.reinforcements += self.calculate_reinforcements(self.current_player)
+    def available_actions(self):
+        yield
 
     def is_terminal(self):
-        """Return True if the State is an end game state.
-        :rtype: bool
-        """
-        return len(self.players) == 1
-
-    def copy(self):
-        """Returns a deepcopy of the state.
-
-        :rtype: State
-        """
-        return deepcopy(self)
-
-    def __eq__(self, other):
-        try:
-            # noinspection PyProtectedMember
-            return (self.board == other.board and
-                    self.players == other.players and
-                    self._current_player_i == other._current_player_i and
-                    self.card_turnins == other.card_turnins and
-                    self.turn_type == other.turn_type)
-        except AttributeError:
-            return False
-
-    def __repr__(self):
-        return ('State({s.board!r},'
-                '\n\t{s.players!r},'
-                '\n\t{s.turn_type!r},'
-                '\n\t{s._current_player_i!r},'
-                '\n\t{s.card_turnins!r})').format(s=self)
+        return True
 
 
 class Board:
@@ -658,6 +456,10 @@ class Territory:
     def __hash__(self):
         return hash(self.name)
 
+    def __str__(self):
+        return "Territory({}, {}, {}, \n\t{})".format(
+            self.name, self.owner, self.troops, self.neighbors)
+
     def __repr__(self):
         return ('Territory({t.name!r}, '
                 '{t.neighbors!r}, '
@@ -740,14 +542,27 @@ DontFortify = namedtuple('DontFortify', [])
 TurnInCards = namedtuple('TurnInCards', [])
 
 
+class Actions(Mapping, Sequence):
+    def __init__(self, f, length):
+        self.f = f
+        self.length = length
+
+    def __getitem__(self, i):
+        return self.f(i)
+
+    def __len__(self):
+        return self.length
+
+
 def integer_partitions(total, n):
-    """Generates all positive integer n-tuples that sum to total"""
+    """Generates all n-length partitions of total"""
     if n == 1:
-        yield total,
+        yield array('H', (total,))
     else:
         for i in range(1, total):
             for sub_partition in integer_partitions(total-i, n-1):
-                yield (i,) + sub_partition
+                sub_partition.append(i)
+                yield sub_partition
 
 
 def _load_territories(file_name):

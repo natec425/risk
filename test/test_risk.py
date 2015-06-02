@@ -32,8 +32,6 @@ class TestRisk(unittest.TestCase):
         state = new_game(["Nate", "Chris"])
 
         self.assertEqual(eval(repr(state)), state)
-        self.assertFalse(state.is_terminal())
-        self.assertEqual("PrePlace", state.turn_type)
 
         for p in state.players:
             self.assertIsInstance(p, Player, "The state should always store Player objects")
@@ -55,41 +53,53 @@ class TestRisk(unittest.TestCase):
         self.assertEqual("Nate", state.current_player.name)
         self.assertIn(PrePlace("Alaska"), state.available_actions())
 
-        state.transition(PrePlace("Alaska"))
+        state = state.transition(PrePlace("Alaska"))
 
         self.assertEqual("Chris", state.current_player.name)
         self.assertEqual("Nate", state.next_player.name)
 
         for i in range(41, 0, -1):
-            self.assertEqual("PrePlace", state.turn_type)
+            self.assertIsInstance(state, PrePlaceState)
             self.assertEqual(i, len(list(state.available_actions())))
-            state.transition(next(state.available_actions()))
+            state = state.transition(next(state.available_actions()))
 
         for t in state.territories:
             self.assertEqual(1, state.troops(t))
 
-        self.assertEqual("PreAssign", state.turn_type)
+        self.assertIsInstance(state, PreAssignState)
         for p in state.players:
             self.assertEqual(19, state.reinforcements(p))
 
         for i in range(19):
-            state.transition(next(state.available_actions()))
-            state.transition(next(state.available_actions()))
+            state = state.transition(next(state.available_actions()))
+            state = state.transition(next(state.available_actions()))
 
-        self.assertEqual("Place", state.turn_type)
+        self.assertIsInstance(state, PlaceState)
         self.assertEqual("Nate", state.current_player.name)
         self.assertEqual(state.calculate_reinforcements("Nate"), state.reinforcements("Nate"))
         self.assertEqual("Chris", state.next_player.name)
         self.assertEqual(0, state.reinforcements("Chris"))
 
-        state.transition(next(state.available_actions()))
+        state = state.transition(next(state.available_actions()))
 
-        self.assertEqual("Attack", state.turn_type)
+        self.assertIsInstance(state, AttackState)
         self.assertEqual("Nate", state.current_player.name)
         self.assertEqual(0, state.reinforcements("Nate"))
 
         for action in state.available_actions():
             self.assertIsOneOf(action, Attack, DontAttack)
             if isinstance(action, Attack):
-                self.assertIn(action.from_territory, state.territories_owned(state.current_player))
-                self.assertNotIn(action.to_territory, state.territories_owned(state.current_player))
+                self.assertIn(action.from_territory,
+                              (t.name for t in state.territories_owned(state.current_player)))
+                self.assertNotIn(action.to_territory,
+                                 (t.name for t in state.territories_owned(state.current_player)))
+
+        state = state.transition(next(a
+                                      for a in state.available_actions()
+                                      if isinstance(a, Attack)))
+        self.assertEqual("Nate", state.current_player.name)
+        self.assertIsInstance(state, AttackState)
+        state = state.transition(DontAttack())
+
+        self.assertEqual("Nate", state.current_player.name)
+        self.assertIsInstance(state, FortifyState)
