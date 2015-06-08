@@ -65,7 +65,7 @@ class RiskState(State):
         else:
             raise ValueError('Argument to players must either be a list of names of Player objects.')
 
-        self.current_player_i = current_player_i
+        self.current_player_i = current_player_i % len(players)
         self.card_turnins = card_turnins
 
     def reinforcements(self, player):
@@ -357,27 +357,23 @@ class AttackState(RiskState):
 
             for attacker_roll, defender_roll in zip(attacker_rolls, defender_rolls):
                 if attacker_roll > defender_roll:
-                    print('Attacker wins {} to {}'.format(attacker_roll, defender_roll))
                     self.board.territories[action.to_territory].troops -= 1
-                    print('{} defenders remaining'.format(self.board.territories[action.to_territory].troops))
                 else:
-                    print('Defender wins {} to {}'.format(defender_roll, attacker_roll))
                     self.board.territories[action.from_territory].troops -= 1
-                    print('{} attackers remaining'.format(self.board.territories[action.from_territory].troops))
 
             if self.troops(action.to_territory) == 0:
-                print(action.to_territory, 'is taken over')
                 remaining_troops = len(list(attacker_rolls)) + 1
-                print(remaining_troops, 'troops are now occupying', action.to_territory)
                 self.board.territories[action.to_territory].owner = self.current_player
                 self.board.territories[action.to_territory].troops = remaining_troops
                 self.board.territories[action.from_territory].troops -= remaining_troops
                 self.occupied = True
 
             if all(t.owner == self.current_player for t in self.territories):
-                return TerminalState(self.board, self.players,
-                                     self.current_player_i, self.card_turnins)
-            return AttackState(self.board, self.players, self.current_player_i,
+                return TerminalState(self.board, [self.current_player],
+                                     0, self.card_turnins)
+            return AttackState(self.board,
+                               [p for p in self.players if any(t.owner == p for t in self.territories)],
+                               self.current_player_i,
                                self.card_turnins, self.occupied)
         else:
             if self.occupied:
