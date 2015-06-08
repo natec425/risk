@@ -1,24 +1,28 @@
-import random
-import sys
-import time
+from concurrent.futures import ProcessPoolExecutor
+import itertools
 
-from risk import new_game, PlaceState
+import risk
+
+
+def play_game(players):
+    state = risk.new_game([p for p in players])
+    while not state.is_terminal():
+        state = state.transition(players[state.current_player.name](state.copy()))
+    return state.winner().name
+
+def play_games(players, n):
+    wins = {p: 0 for p in players}
+    with ProcessPoolExecutor(max_workers=4) as executor:
+        for winner in executor.map(play_game, itertools.repeat(players, n)):
+            wins[winner] += 1
+    return wins
+
+def get_action(state):
+    return next(state.available_actions().sample(1))
 
 if __name__ == '__main__':
-    state = new_game(['Bot1', 'Bot2'])
-    while not state.is_terminal():
-        if isinstance(state, PlaceState):
-            print('Number of Territories owned: ', len(list(state.territories_owned(state.current_player))))
-            print('Number of Continents owned: ', len(list(state.continents_owned(state.current_player))))
-            print('Number of Reinforcements: ', state.reinforcements(state.current_player))
-            start = time.time()
-            count = 0
-            for a in state.available_actions():
-                count += 1
-            print('Time to generate all actions: ', time.time() - start)
-            print('Number of actions: ', count)
-            sys.exit()
-        else:
-            print(state.__class__)
-            choice = random.choice(state.available_actions())
-            state = state.transition(choice)
+    players = {"Nate": get_action,
+               "Chris": get_action}
+
+    print(play_game(players))
+
