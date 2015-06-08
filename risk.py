@@ -362,6 +362,8 @@ class AttackState(RiskState):
                     self.board.territories[action.from_territory].troops -= 1
 
             if self.troops(action.to_territory) == 0:
+                if sum(1 for _ in self.territories_owned(self.owner(action.to_territory))) == 0:
+                    self.current_player.cards.extend(self.owner(action.to_territory).cards)
                 remaining_troops = len(list(attacker_rolls)) + 1
                 self.board.territories[action.to_territory].owner = self.current_player
                 self.board.territories[action.to_territory].troops = remaining_troops
