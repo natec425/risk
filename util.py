@@ -32,3 +32,18 @@ def kth_n_combination(items, n, k):
     else:
         return kth_n_combination(items[1:], n, k - combos_with_first)
 
+
+def kth_n_integer_composition(total, n, k):
+    if n == 0:
+        return tuple()
+    for i in range(total - n + 1, 0, -1):
+        items_starting_i = num_compos_starting_with_i(total, n, i)
+        if k < items_starting_i:
+            return (i,) + kth_n_integer_composition(total - i, n - 1, k)
+        else:
+            k -= items_starting_i
+
+def num_compos_starting_with_i(total, n, i):
+    if n == 1:
+        return 1
+    return int(choose(total - 1 - i, n - 2))
