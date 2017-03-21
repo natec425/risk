@@ -4,4 +4,6 @@ lib/
 __pycache__/
 .pyc
 *~
-#*#
+.cache
+.coverage
+htmlcov

@@ -1,0 +1,6 @@
+[{"name": "Asia", "territories": ["Afghanistan", "China", "India", "Irkutsk", "Japan", "Kamchatka", "Middle East", "Mongolia", "Siam", "Siberia", "Ural", "Yakutsk"], "bonus": 7},
+ {"name": "Australia", "territories": ["Eastern Australia", "Indonesia", "New Guinea", "Western Australia"], "bonus": 2},
+ {"name": "Europe", "territories": ["Great Britain", "Iceland", "Northern Europe", "Scandinavia", "Southern Europe", "Ukraine", "Western Europe"], "bonus": 5},
+ {"name": "South America", "territories": ["Argentina", "Brazil", "Peru", "Venezuela"], "bonus": 2},
+ {"name": "North America", "territories": ["Alaska", "Alberta", "Central America", "Eastern United States", "Greenland", "Northwest Territory", "Ontario", "Quebec", "Western United States"], "bonus": 5},
+ {"name": "Africa", "territories": ["Congo", "East Africa", "Egypt", "Madagascar", "North Africa", "South Africa"], "bonus": 3}]
