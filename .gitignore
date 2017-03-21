@@ -4,4 +4,4 @@ lib/
 __pycache__/
 .pyc
 *~
-#*#
+.cache
