@@ -61,7 +61,7 @@ class TestRisk(unittest.TestCase):
         for i in range(41, 0, -1):
             self.assertIsInstance(state, PrePlaceState)
             self.assertEqual(i, len(list(state.available_actions())))
-            state = state.transition(next(state.available_actions()))
+            state = state.transition(next(iter(state.available_actions())))
 
         for t in state.territories:
             self.assertEqual(1, state.troops(t))
@@ -71,8 +71,8 @@ class TestRisk(unittest.TestCase):
             self.assertEqual(19, state.reinforcements(p))
 
         for i in range(19):
-            state = state.transition(next(state.available_actions()))
-            state = state.transition(next(state.available_actions()))
+            state = state.transition(next(iter(state.available_actions())))
+            state = state.transition(next(iter(state.available_actions())))
 
         self.assertIsInstance(state, PlaceState)
         self.assertEqual("Nate", state.current_player.name)
@@ -80,7 +80,7 @@ class TestRisk(unittest.TestCase):
         self.assertEqual("Chris", state.next_player.name)
         self.assertEqual(0, state.reinforcements("Chris"))
 
-        state = state.transition(next(state.available_actions()))
+        state = state.transition(next(iter(state.available_actions())))
 
         self.assertIsInstance(state, AttackState)
         self.assertEqual("Nate", state.current_player.name)
