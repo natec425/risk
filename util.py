@@ -1,8 +1,9 @@
 from math import factorial as fact
 from array import array
+from typing import Iterable
 
 
-def integer_compositions(total, n):
+def integer_compositions(total: int, n: int) -> Iterable[array] :
     """Generates all n-length partitions of total"""
     if n == 1:
         yield array('H', (total, ))
