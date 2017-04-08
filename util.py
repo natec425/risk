@@ -14,10 +14,10 @@ def integer_compositions(total: int, n: int) -> Iterable[array] :
                 yield sub_partition
 
 
-def choose(n, k):
+def choose(n: int, k: int) -> int:
     if k > n:
         return 0
-    return fact(n) / (fact(k) * fact(n - k))
+    return fact(n) // (fact(k) * fact(n - k))
 
 
 def kth_n_combination(items, n, k):

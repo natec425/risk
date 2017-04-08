@@ -30,3 +30,15 @@ def test_integer_composition_of_three():
         (1, 1, 1)
     }
     assert actual == expected
+
+def test_choose_with_known_examples():
+    examples = {
+        (0, 0): 1,
+        (0, 1): 0,
+        (1, 0): 1,
+        (4, 2): 6,
+        (2, 4): 0,
+        (10, 3): 120
+    }
+    for ((n, k), expected) in examples.items():
+        assert util.choose(n, k) == expected
