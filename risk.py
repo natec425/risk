@@ -26,7 +26,7 @@ import os
 import random
 from abc import ABCMeta, abstractmethod
 
-from typing import Union
+from typing import Union, Dict, Callable
 
 import util
 
@@ -647,7 +647,7 @@ class Cards(Enum):
         return random.choice(list(cls))
 
 
-def _load_territories(file_name):
+def _load_territories(file_name: str) -> Dict[str, Territory]:
     with open(file_name) as handle:
         territories = {
             name: Territory(name, set(neighbors))
@@ -656,7 +656,7 @@ def _load_territories(file_name):
     return territories
 
 
-def _load_continents(file_name, territories):
+def _load_continents(file_name: str, territories: Dict[str, Territory]) -> Dict[str, Continent]:
     continents = {}
     with open(file_name) as handle:
         for cont in json.load(handle):
@@ -665,7 +665,10 @@ def _load_continents(file_name, territories):
     return continents
 
 
-def new_game(players):
+Strategy = Callable[[RiskState], Move]
+
+
+def new_game(players: Dict[str, Strategy]) -> RiskState:
     """Returns a fresh game State to start a game from."""
     territories = _load_territories(TERRITORIES_FILE)
     continents = _load_continents(CONTINENTS_FILE, territories)
