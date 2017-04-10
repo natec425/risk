@@ -3,7 +3,7 @@ from array import array
 from typing import Iterable
 
 
-def integer_compositions(total: int, n: int) -> Iterable[array] :
+def integer_compositions(total: int, n: int) -> Iterable[array]:
     """Generates all n-length partitions of total"""
     if n == 1:
         yield array('H', (total, ))
@@ -25,8 +25,7 @@ def kth_n_combination(items, n, k):
         return []
     total_combos = choose(len(items), n)
     if k >= total_combos:
-        raise IndexError(
-            "There aren't {} {}-combinations of {}.".format(k + 1, n, items))
+        raise IndexError("There aren't {} {}-combinations of {}.".format(k + 1, n, items))
     combos_without_first = choose(len(items) - 1, n)
     combos_with_first = total_combos - combos_without_first
     if k < combos_with_first:
