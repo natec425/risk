@@ -402,12 +402,9 @@ class AttackState(RiskState):
                 else:
                     self.board.territories[action.from_territory].troops -= 1
 
+            defender = self.owner(action.to_territory)
+
             if self.troops(action.to_territory) == 0:
-                if sum(1
-                       for _ in self.territories_owned(
-                           self.owner(action.to_territory))) == 0:
-                    self.current_player.cards.extend(
-                        self.owner(action.to_territory).cards)
                 remaining_troops = len(list(attacker_rolls)) + 1
                 self.board.territories[
                     action.to_territory].owner = self.current_player
@@ -417,13 +414,20 @@ class AttackState(RiskState):
                     action.from_territory].troops -= remaining_troops
                 self.occupied = True
 
+                if len(list(self.territories_owned(defender))) == 0:
+                    self.current_player.cards.extend(defender.cards)
+                    defender_i = self.players.index(defender)
+
+                    if defender_i < self.current_player_i:
+                        self.current_player_i -= 1
+
+                    self.players.pop(defender_i)
+
+
             if all(t.owner == self.current_player for t in self.territories):
                 return TerminalState(self.board, [self.current_player], 0,
                                      self.card_turnins)
-            return AttackState(self.board, [
-                p for p in self.players
-                if any(t.owner == p for t in self.territories)
-            ], self.current_player_i, self.card_turnins, self.occupied)
+            return AttackState(self.board, self.players, self.current_player_i, self.card_turnins, self.occupied)
         else:
             if self.occupied:
                 self.current_player.cards.append(Cards.new_card())
