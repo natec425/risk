@@ -2,6 +2,7 @@ from concurrent.futures import ProcessPoolExecutor
 from multiprocessing import cpu_count
 import itertools
 
+import agents
 import risk
 
 
@@ -20,12 +21,7 @@ def play_games(players, n):
             wins[winner] += 1
     return wins
 
-
-def get_action(state):
-    return next(state.available_actions().sample(1))
-
-
 if __name__ == '__main__':
-    players = {"Nate": get_action, "Chris": get_action}
+    players = {"Nate": agents.console_agent, "Chris": agents.random_agent}
 
     print(play_game(players))

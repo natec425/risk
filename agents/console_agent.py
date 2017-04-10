@@ -53,7 +53,7 @@ def get_action(state: RiskState) -> Move:
             print("Invalid Input")
             print(e)
 
-def text_action(state: RiskState):
+def strategy(state: RiskState):
     print(show_game_state(state))
     return get_action(state)
 
