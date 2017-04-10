@@ -26,6 +26,8 @@ import os
 import random
 from abc import ABCMeta, abstractmethod
 
+from typing import Union
+
 import util
 
 TERRITORIES_FILE = os.path.join(os.path.dirname(__file__), 'territories.json')
@@ -666,6 +668,8 @@ Fortify = namedtuple('Fortify', ['from_territory', 'to_territory', 'troops'])
 DontFortify = namedtuple('DontFortify', [])
 TurnInCards = namedtuple('TurnInCards', [])
 
+Move = Union[PrePlace, PreAssign, Place, Attack, DontAttack, Fortify,
+             DontFortify, TurnInCards]
 
 class Actions:
     def __init__(
