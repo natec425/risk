@@ -280,7 +280,7 @@ class PlaceState(RiskState):
                 for n in range(1, min(num_territories, num_reinforcements))))
 
     def available_actions(self):
-        territories_owned = list(self.territories_owned(self.current_player))
+        territories_owned = [t.name for t in self.territories_owned(self.current_player)]
         reinforcements = self.reinforcements(self.current_player)
         max_n = min(len(territories_owned), reinforcements)
 
@@ -312,7 +312,7 @@ class PlaceState(RiskState):
         if not isinstance(action, Place):
             raise ValueError("PlaceState cannot process {!r}".format(action))
 
-        owned_terrs = [t for t in self.territories_owned(self.current_player)]
+        owned_terrs = [t.name for t in self.territories_owned(self.current_player)]
         if any(terr not in owned_terrs for terr in action.territories):
             raise ValueError(
                 """You can only place troops on territories you own.
@@ -329,7 +329,7 @@ class PlaceState(RiskState):
                 "You must provide an troop allocation for each territory.")
 
         for terr, troop in zip(action.territories, action.troops):
-            self.board.territories[terr.name].troops += troop
+            self.board.territories[terr].troops += troop
             self.current_player.reinforcements -= troop
 
         return AttackState(self.board, self.players, self.current_player_i,
