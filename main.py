@@ -1,4 +1,5 @@
 from concurrent.futures import ProcessPoolExecutor
+from multiprocessing import cpu_count
 import itertools
 
 import risk
@@ -14,7 +15,7 @@ def play_game(players):
 
 def play_games(players, n):
     wins = {p: 0 for p in players}
-    with ProcessPoolExecutor(max_workers=4) as executor:
+    with ProcessPoolExecutor(max_workers=cpu_count()) as executor:
         for winner in executor.map(play_game, itertools.repeat(players, n)):
             wins[winner] += 1
     return wins
