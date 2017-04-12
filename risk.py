@@ -348,6 +348,8 @@ class AttackState(RiskState):
                 raise ValueError("You can only attack neighboring territories.")
             if action.troops < 2:
                 raise ValueError("You can't attack with less than 2 troops.")
+            if action.troops > self.troops(action.from_territory):
+                raise ValueError("You can't attack with more troops than you have.")
 
             attacker_rolls = iter(
                 sorted((random.randint(1, 6) for _ in range(action.troops - 1)), reverse=True))
