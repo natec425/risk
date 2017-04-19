@@ -24,8 +24,6 @@ def can_attack(state: risk.RiskState, t: risk.Territory) -> bool:
 
 
 def strategy(state: risk.RiskState) -> risk.Move:
-    print(show_game_state(state))
-    input()
     if isinstance(state, risk.PrePlaceState):
         return risk.PrePlace(most_friendly_connections(state).name)
     elif isinstance(state, risk.PreAssignState):
