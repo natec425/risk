@@ -28,17 +28,12 @@ from abc import ABCMeta, abstractmethod
 
 from typing import Union, Dict, Callable
 
-import util
 
 TERRITORIES_FILE = os.path.join(os.path.dirname(__file__), 'territories.json')
 CONTINENTS_FILE = os.path.join(os.path.dirname(__file__), 'continents.json')
 
 
 class State(metaclass=ABCMeta):
-    @abstractmethod
-    def available_actions(self):
-        ...
-
     @abstractmethod
     def transition(self, action):
         ...
@@ -187,19 +182,6 @@ class RiskState(State):
 
 
 class PrePlaceState(RiskState):
-    def available_actions(self):
-        unoccupied_territories = list(t.name for t in self.territories if t.owner is None)
-
-        def sample(n):
-            for t in random.sample(unoccupied_territories, n):
-                yield PrePlace(t)
-
-        def _iter():
-            for name in unoccupied_territories:
-                yield PrePlace(name)
-
-        return Actions(sample, _iter, len(unoccupied_territories))
-
     def transition(self, action):
         if not isinstance(action, PrePlace):
             raise ValueError("PrePlaceState cannot process {!r}".format(action))
@@ -221,19 +203,6 @@ class PrePlaceState(RiskState):
 
 
 class PreAssignState(RiskState):
-    def available_actions(self):
-        owned_terrs = list(t.name for t in self.territories_owned(self.current_player))
-
-        def sample(n):
-            for t in random.sample(owned_terrs, n):
-                yield PreAssign(t)
-
-        def _iter():
-            for name in owned_terrs:
-                yield PreAssign(name)
-
-        return Actions(sample, _iter, len(owned_terrs))
-
     def transition(self, action):
         if not isinstance(action, PreAssign):
             raise ValueError("PreAssignState cannot process {!r}".format(action))
@@ -254,41 +223,6 @@ class PreAssignState(RiskState):
 
 
 class PlaceState(RiskState):
-    def _action_space_len(self):
-        num_territories = sum(1 for _ in self.territories_owned(self.current_player))
-        num_reinforcements = self.reinforcements(self.current_player)
-
-        return int(
-            sum(
-                util.choose(num_territories, n) * util.choose(num_reinforcements - 1, n - 1)
-                for n in range(1, min(num_territories, num_reinforcements))))
-
-    def available_actions(self):
-        territories_owned = [t.name for t in self.territories_owned(self.current_player)]
-        reinforcements = self.reinforcements(self.current_player)
-        max_n = min(len(territories_owned), reinforcements)
-
-        def sample(n):
-            actions = []
-            while len(actions) < n:
-                n = random.randint(1, max_n)
-                combo_i = random.randint(0, util.choose(len(territories_owned), n) - 1)
-                alloc_i = random.randint(0, util.choose(reinforcements - 1, n - 1) - 1)
-                combo = util.kth_n_combination(territories_owned, n, combo_i)
-                alloc = util.kth_n_integer_composition(reinforcements, n, alloc_i)
-                action = Place(combo, alloc)
-                if action not in actions:
-                    yield action
-                    actions.append(action)
-
-        def _iter():
-            for n in range(1, max_n):
-                for terrs in itertools.combinations(territories_owned, n):
-                    for troops in util.integer_compositions(reinforcements, n):
-                        yield Place(terrs, troops)
-
-        return Actions(sample, _iter, self._action_space_len())
-
     def transition(self, action):
         if not isinstance(action, Place):
             raise ValueError("PlaceState cannot process {!r}".format(action))
@@ -315,23 +249,6 @@ class AttackState(RiskState):
     def __init__(self, board, players, current_player_i=0, card_turnins=0, occupied=False):
         super().__init__(board, players, current_player_i, card_turnins)
         self.occupied = occupied
-
-    def available_actions(self):
-        actions = [
-            Attack(owned.name, neighbor, troops)
-            for owned in self.territories_owned(self.current_player)
-            for neighbor in self.neighbors(owned)
-            if self.owner(neighbor).name != self.current_player.name
-            for troops in range(2, self.troops(owned))
-        ] + [DontAttack()]
-
-        def sample(n):
-            yield from random.sample(actions, n)
-
-        def _iter():
-            return iter(actions)
-
-        return Actions(sample, _iter, len(actions))
 
     def transition(self, action):
         attack = isinstance(action, Attack)
@@ -393,22 +310,6 @@ class AttackState(RiskState):
 
 
 class FortifyState(RiskState):
-    def available_actions(self):
-        terrs_owned = set(self.territories_owned(self.current_player))
-        actions = [
-            Fortify(source.name, dest, n)
-            for source in terrs_owned for dest in self.neighbors(source)
-            if dest in terrs_owned for n in range(1, self.troops(source) - 1)
-        ] + [DontFortify()]
-
-        def sample(n):
-            yield from random.sample(actions, n)
-
-        def _iter():
-            return iter(actions)
-
-        return Actions(sample, _iter, len(actions))
-
     def transition(self, action):
         fortify = isinstance(action, Fortify)
         dont_fortify = isinstance(action, DontFortify)
@@ -432,9 +333,6 @@ class FortifyState(RiskState):
 class TerminalState(RiskState):
     def transition(self, action):
         raise NotImplemented
-
-    def available_actions(self):
-        yield
 
     def is_terminal(self):
         return True
@@ -618,26 +516,6 @@ DontFortify = namedtuple('DontFortify', [])
 TurnInCards = namedtuple('TurnInCards', [])
 
 Move = Union[PrePlace, PreAssign, Place, Attack, DontAttack, Fortify, DontFortify, TurnInCards]
-
-
-class Actions:
-    def __init__(
-            self,
-            sample,
-            iter,
-            length, ):
-        self.sample = sample
-        self.iter = iter
-        self.length = length
-
-    def __iter__(self):
-        return self.iter()
-
-    def sample(self, n):
-        yield from self.sample(n)
-
-    def __len__(self):
-        return self.length
 
 
 # Cards

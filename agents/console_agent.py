@@ -4,6 +4,8 @@ from tabulate import tabulate
 from typing import List
 import sys
 
+from .helpers import available_actions
+
 terminal = blessed.Terminal()
 
 def show_current_player(current_player: Player) -> str:
@@ -42,7 +44,7 @@ def show_game_state(state: RiskState) -> str:
 
 def get_action(state: RiskState) -> Move:
     if isinstance(state, PreAssignState) or isinstance(state, PrePlaceState):
-        return next(state.available_actions().sample(1))
+        return next(available_actions(state).sample(1))
     while True:
         try:
             return eval(input("What would you like to do: "))

@@ -1,6 +1,7 @@
 import unittest
 
 from risk import *
+from agents.helpers import available_actions
 
 
 class TestRisk(unittest.TestCase):
@@ -46,12 +47,12 @@ class TestRisk(unittest.TestCase):
     def test_two_player(self):
         state = new_game(["Nate", "Chris"])
 
-        for action in state.available_actions():
+        for action in available_actions(state):
             self.assertIsInstance(action, PrePlace, "Players should only be able to PrePlace at this point")
-        self.assertEqual(42, len(list(state.available_actions())), "There should be one PrePlace action per territory")
+        self.assertEqual(42, len(list(available_actions(state))), "There should be one PrePlace action per territory")
 
         self.assertEqual("Nate", state.current_player.name)
-        self.assertIn(PrePlace("Alaska"), state.available_actions())
+        self.assertIn(PrePlace("Alaska"), available_actions(state))
 
         state = state.transition(PrePlace("Alaska"))
 
@@ -60,8 +61,8 @@ class TestRisk(unittest.TestCase):
 
         for i in range(41, 0, -1):
             self.assertIsInstance(state, PrePlaceState)
-            self.assertEqual(i, len(list(state.available_actions())))
-            state = state.transition(next(iter(state.available_actions())))
+            self.assertEqual(i, len(list(available_actions(state))))
+            state = state.transition(next(iter(available_actions(state))))
 
         for t in state.territories:
             self.assertEqual(1, state.troops(t))
@@ -71,8 +72,8 @@ class TestRisk(unittest.TestCase):
             self.assertEqual(19, state.reinforcements(p))
 
         for i in range(19):
-            state = state.transition(next(iter(state.available_actions())))
-            state = state.transition(next(iter(state.available_actions())))
+            state = state.transition(next(iter(available_actions(state))))
+            state = state.transition(next(iter(available_actions(state))))
 
         self.assertIsInstance(state, PlaceState)
         self.assertEqual("Nate", state.current_player.name)
@@ -80,13 +81,13 @@ class TestRisk(unittest.TestCase):
         self.assertEqual("Chris", state.next_player.name)
         self.assertEqual(0, state.reinforcements("Chris"))
 
-        state = state.transition(next(iter(state.available_actions())))
+        state = state.transition(next(iter(available_actions(state))))
 
         self.assertIsInstance(state, AttackState)
         self.assertEqual("Nate", state.current_player.name)
         self.assertEqual(0, state.reinforcements("Nate"))
 
-        for action in state.available_actions():
+        for action in available_actions(state):
             self.assertIsOneOf(action, Attack, DontAttack)
             if isinstance(action, Attack):
                 self.assertIn(action.from_territory,
@@ -95,7 +96,7 @@ class TestRisk(unittest.TestCase):
                                  (t.name for t in state.territories_owned(state.current_player)))
 
         state = state.transition(next(a
-                                      for a in state.available_actions()
+                                      for a in available_actions(state)
                                       if isinstance(a, Attack)))
         self.assertEqual("Nate", state.current_player.name)
         self.assertIsInstance(state, AttackState)
